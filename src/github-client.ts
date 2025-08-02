@@ -16,8 +16,25 @@ export interface GitHubRepository {
   default_branch: string;
 }
 
+// Type for GitHub API response items
+export interface GitHubSearchItem {
+  repository: {
+    id: number;
+    name: string;
+    full_name: string;
+    description: string | null;
+    stargazers_count: number | undefined;
+    forks_count: number | undefined;
+    language: string | null | undefined;
+    created_at: string | undefined;
+    updated_at: string | undefined;
+    clone_url: string | undefined;
+    default_branch: string | undefined;
+  };
+}
+
 export interface GitHubContent {
-  type: "file" | "dir";
+  type: "file" | "dir" | "submodule" | "symlink";
   name: string;
   path: string;
   size?: number;
@@ -144,13 +161,13 @@ export class GitHubClient {
           name: item.repository.name,
           full_name: item.repository.full_name,
           description: item.repository.description,
-          stargazers_count: item.repository.stargazers_count,
-          forks_count: item.repository.forks_count,
-          language: item.repository.language,
-          created_at: item.repository.created_at,
-          updated_at: item.repository.updated_at,
-          clone_url: item.repository.clone_url,
-          default_branch: item.repository.default_branch,
+          stargazers_count: item.repository.stargazers_count ?? 0,
+          forks_count: item.repository.forks_count ?? 0,
+          language: item.repository.language ?? null,
+          created_at: item.repository.created_at ?? "",
+          updated_at: item.repository.updated_at ?? "",
+          clone_url: item.repository.clone_url ?? "",
+          default_branch: item.repository.default_branch ?? "main",
         });
       }
     }
@@ -246,7 +263,8 @@ export class GitHubClient {
         path,
       });
 
-      if (response.data.type === "file") {
+      // Handle single file response
+      if (!Array.isArray(response.data) && response.data.type === "file") {
         return Buffer.from(response.data.content, "base64").toString("utf-8");
       }
 

@@ -36,8 +36,10 @@
     "dotenv": "^16.3.1"
   },
   "devDependencies": {
-    "es-guard": "^1.9.0",
+    "@types/cli-progress": "3.11.6",
+    "@types/js-yaml": "4.0.9",
     "@types/node": "^20.0.0",
+    "es-guard": "^1.9.0",
     "typescript": "^5.0.0"
   }
 }

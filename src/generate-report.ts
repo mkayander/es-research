@@ -386,7 +386,7 @@ The analysis provides a statistically significant sample with:
 - **File Patterns**: ${config.research.filePatterns.join(", ")}
 - **Excluded Patterns**: ${config.research.excludePatterns.join(", ")}
 - **Max File Size**: ${(metadata.config.maxFileSize / 1024 / 1024).toFixed(1)}MB
-- **Analysis Timeout**: ${metadata.config.analysisTimeout / 1000}s
+- **Analysis Timeout**: ${config.analysis.analysisTimeout / 1000}s
 
 ### Data Collection
 - **Collection Date**: ${metadata.timestamp}

@@ -9,6 +9,7 @@ import {
   ensureDir,
   filterFiles,
   parsePackageJson,
+  parseRepositoryName,
   formatDuration,
   formatBytes,
   calculateConfidenceInterval,

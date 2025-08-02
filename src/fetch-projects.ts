@@ -201,8 +201,12 @@ function generateProjectStats(projects: GitHubRepository[]): ProjectStats {
     maxStars: Math.max(...stars),
     minForks: Math.min(...forks),
     maxForks: Math.max(...forks),
-    oldestDate: new Date(Math.min(...dates)).toISOString().split("T")[0],
-    newestDate: new Date(Math.max(...dates)).toISOString().split("T")[0],
+    oldestDate: new Date(Math.min(...dates.map((d) => d.getTime())))
+      .toISOString()
+      .split("T")[0],
+    newestDate: new Date(Math.max(...dates.map((d) => d.getTime())))
+      .toISOString()
+      .split("T")[0],
     languages,
     starDistribution: {
       "0-100": stars.filter((s) => s <= 100).length,
