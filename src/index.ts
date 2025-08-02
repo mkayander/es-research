@@ -48,7 +48,7 @@ program
         validateConfig();
         await ensureDir(config.output.dataDir);
 
-        const { main: fetchMain } = await import("./fetch-projects.js");
+        const { main: fetchMain } = await import("./fetch-projects.ts");
         await fetchMain();
       } catch (error) {
         console.error(chalk.red("Error:", (error as Error).message));
@@ -93,7 +93,7 @@ program
         validateConfig();
         await ensureDir(config.output.dataDir);
 
-        const { main: analyzeMain } = await import("./analyze-projects.js");
+        const { main: analyzeMain } = await import("./analyze-projects.ts");
         await analyzeMain();
       } catch (error) {
         console.error(chalk.red("Error:", (error as Error).message));
@@ -110,7 +110,7 @@ program
       validateConfig();
       await ensureDir(config.output.reportsDir);
 
-      const { main: reportMain } = await import("./generate-report.js");
+      const { main: reportMain } = await import("./generate-report.ts");
       await reportMain();
     } catch (error) {
       console.error(chalk.red("Error:", (error as Error).message));
@@ -189,17 +189,17 @@ program
 
         // Step 1: Fetch projects
         console.log(chalk.blue("📥 Step 1: Fetching projects..."));
-        const { main: fetchMain } = await import("./fetch-projects.js");
+        const { main: fetchMain } = await import("./fetch-projects.ts");
         await fetchMain();
 
         // Step 2: Analyze projects
         console.log(chalk.blue("\n🔍 Step 2: Analyzing projects..."));
-        const { main: analyzeMain } = await import("./analyze-projects.js");
+        const { main: analyzeMain } = await import("./analyze-projects.ts");
         await analyzeMain();
 
         // Step 3: Generate reports
         console.log(chalk.blue("\n📊 Step 3: Generating reports..."));
-        const { main: reportMain } = await import("./generate-report.js");
+        const { main: reportMain } = await import("./generate-report.ts");
         await reportMain();
 
         console.log(
@@ -235,7 +235,7 @@ program
       console.log(chalk.green("✅ Configuration is valid"));
 
       // Check es-guard availability
-      const { ESGuardAnalyzer } = await import("./es-guard-analyzer.js");
+      const { ESGuardAnalyzer } = await import("./es-guard-analyzer.ts");
       const analyzer = new ESGuardAnalyzer();
       const esGuardAvailable = await analyzer.checkESGuardAvailability();
 
