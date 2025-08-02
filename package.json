@@ -23,7 +23,7 @@
   ],
   "author": "",
   "license": "ISC",
-  "packageManager": "bun@1.0.0",
+  "packageManager": "bun@1.2.19",
   "dependencies": {
     "octokit": "^4.0.2",
     "axios": "^1.6.2",
