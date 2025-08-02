@@ -75,7 +75,7 @@ async function main(): Promise<void> {
       );
     }
 
-    const { summary, results, errors, metadata } = analysisData;
+    const { summary, results, metadata } = analysisData;
 
     // Create reports directory
     await ensureDir(config.output.reportsDir);
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
     // Generate different report formats
     await generateCSVReports(results, summary);
     await generateJSONReports(results, summary, metadata);
-    await generateMarkdownReport(results, summary, metadata, errors);
+    await generateMarkdownReport(results, summary, metadata);
     await generateYAMLReport(summary, metadata);
 
     console.log(chalk.green.bold("\n✅ Reports generated successfully!"));
@@ -121,7 +121,9 @@ async function generateCSVReports(
     Project: result.project.full_name,
     Stars: result.project.stargazers_count,
     Forks: result.project.forks_count,
-    "Total Files": (result as any).fileDiscovery?.totalFiles || 0,
+    "Total Files":
+      (result as { fileDiscovery?: { totalFiles: number } }).fileDiscovery
+        ?.totalFiles ?? 0,
     "Analyzed Files": result.analysis.analyzedFiles,
     "Files With Issues": result.statistics.filesWithIssues,
     "Total Issues": result.statistics.totalIssues,
@@ -163,12 +165,12 @@ async function generateCSVReports(
         issueRecords.push({
           Project: result.project.full_name,
           "File Path": fileResult.filePath,
-          "Issue Type": issue.type || "unknown",
-          Category: issue.category || "unknown",
-          Severity: issue.severity || "info",
-          Message: issue.message || "",
-          Line: issue.line?.toString() || "",
-          Column: issue.column?.toString() || "",
+          "Issue Type": issue.type ?? "unknown",
+          Category: issue.category ?? "unknown",
+          Severity: issue.severity ?? "info",
+          Message: issue.message ?? "",
+          Line: issue.line?.toString() ?? "",
+          Column: issue.column?.toString() ?? "",
         });
       }
     }
@@ -246,7 +248,8 @@ async function generateJSONReports(
       project: result.project,
       analysis: result.analysis,
       statistics: result.statistics,
-      fileDiscovery: (result as any).fileDiscovery,
+      fileDiscovery: (result as { fileDiscovery?: { totalFiles: number } })
+        .fileDiscovery,
       topIssues: getTopIssuesForProject(result),
     })),
   });
@@ -271,22 +274,20 @@ async function generateJSONReports(
 async function generateMarkdownReport(
   results: ProjectAnalysisResult[],
   summary: AnalysisData["summary"],
-  metadata: AnalysisData["metadata"],
-  errors: AnalysisData["errors"]
+  metadata: AnalysisData["metadata"]
 ): Promise<void> {
   console.log(chalk.blue("📊 Generating Markdown report..."));
 
-  const markdown = generateMarkdownContent(results, summary, metadata, errors);
+  const markdown = generateMarkdownContent(results, summary, metadata);
   await saveJson(`${config.output.reportsDir}/research-report.md`, markdown);
 
   console.log(chalk.green("  ✅ Markdown report generated"));
 }
 
 function generateMarkdownContent(
-  results: ProjectAnalysisResult[],
+  _results: ProjectAnalysisResult[],
   summary: AnalysisData["summary"],
-  metadata: AnalysisData["metadata"],
-  errors: AnalysisData["errors"]
+  metadata: AnalysisData["metadata"]
 ): string {
   const { overview, statistics } = summary;
 
@@ -434,8 +435,8 @@ function getTopIssuesForProject(
 
   for (const fileResult of result.results) {
     for (const issue of fileResult.issues) {
-      const type = issue.type || "unknown";
-      issueTypes[type] = (issueTypes[type] || 0) + 1;
+      const type = issue.type ?? "unknown";
+      issueTypes[type] = (issueTypes[type] ?? 0) + 1;
     }
   }
 

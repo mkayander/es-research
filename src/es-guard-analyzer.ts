@@ -190,12 +190,12 @@ export class ESGuardAnalyzer {
 
     for (const issue of issues) {
       // Count by category
-      const category = issue.category || "unknown";
-      summary.categories[category] = (summary.categories[category] || 0) + 1;
+      const category = issue.category ?? "unknown";
+      summary.categories[category] = (summary.categories[category] ?? 0) + 1;
 
       // Count by severity
-      const severity = issue.severity || "info";
-      summary.severity[severity] = (summary.severity[severity] || 0) + 1;
+      const severity = issue.severity ?? "info";
+      summary.severity[severity] = (summary.severity[severity] ?? 0) + 1;
     }
 
     return summary;
@@ -237,9 +237,11 @@ export class ESGuardAnalyzer {
     while (queue.length > 0 || running.size > 0) {
       // Start new tasks up to concurrency limit
       while (running.size < concurrency && queue.length > 0) {
-        const file = queue.shift()!;
-        running.add(file);
-        processFile(file);
+        const file = queue.shift();
+        if (file) {
+          running.add(file);
+          void processFile(file);
+        }
       }
 
       // Wait a bit before checking again
@@ -286,10 +288,7 @@ export class ESGuardAnalyzer {
         totalFiles: files.length,
         analyzedFiles: results.length,
         filesWithIssues: results.filter((r) => r.hasIssues).length,
-        totalIssues: results.reduce(
-          (sum, r) => sum + (r.summary?.total || 0),
-          0
-        ),
+        totalIssues: results.reduce((sum, r) => sum + r.summary.total, 0),
         duration,
         timestamp: new Date().toISOString(),
       },
@@ -320,31 +319,26 @@ export class ESGuardAnalyzer {
         stats.filesWithIssues++;
       }
 
-      if (result.summary) {
-        stats.totalIssues += result.summary.total;
+      stats.totalIssues += result.summary.total;
 
-        // Aggregate categories
-        for (const [category, count] of Object.entries(
-          result.summary.categories
-        )) {
-          stats.categories[category] =
-            (stats.categories[category] || 0) + count;
-        }
+      // Aggregate categories
+      for (const [category, count] of Object.entries(
+        result.summary.categories
+      )) {
+        stats.categories[category] = (stats.categories[category] ?? 0) + count;
+      }
 
-        // Aggregate severity
-        for (const [severity, count] of Object.entries(
-          result.summary.severity
-        )) {
-          stats.severity[severity as keyof typeof stats.severity] =
-            (stats.severity[severity as keyof typeof stats.severity] || 0) +
-            count;
-        }
+      // Aggregate severity
+      for (const [severity, count] of Object.entries(result.summary.severity)) {
+        stats.severity[severity as keyof typeof stats.severity] =
+          (stats.severity[severity as keyof typeof stats.severity] ?? 0) +
+          count;
       }
 
       // Aggregate issue types
       for (const issue of result.issues) {
-        const type = issue.type || "unknown";
-        stats.issueTypes[type] = (stats.issueTypes[type] || 0) + 1;
+        const type = issue.type ?? "unknown";
+        stats.issueTypes[type] = (stats.issueTypes[type] ?? 0) + 1;
       }
     }
 

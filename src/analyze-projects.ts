@@ -1,24 +1,26 @@
 #!/usr/bin/env bun
 
-import { GitHubClient } from "./github-client.js";
-import { ESGuardAnalyzer, type FileToAnalyze } from "./es-guard-analyzer.js";
+import {
+  GitHubClient,
+  type GitHubRepository,
+  type GitHubContent,
+} from "./github-client.js";
+import {
+  ESGuardAnalyzer,
+  type FileToAnalyze,
+  type ProjectAnalysisResult,
+} from "./es-guard-analyzer.js";
 import { config, validateConfig } from "./config.js";
 import {
   loadJson,
   saveJson,
   ensureDir,
   filterFiles,
-  parsePackageJson,
   parseRepositoryName,
-  formatDuration,
-  formatBytes,
   calculateConfidenceInterval,
 } from "./utils.js";
 import chalk from "chalk";
-import ora from "ora";
 import cliProgress from "cli-progress";
-import type { GitHubRepository, GitHubContent } from "./github-client.js";
-import type { ProjectAnalysisResult } from "./es-guard-analyzer.js";
 
 interface AnalysisError {
   project: string;
@@ -131,6 +133,8 @@ async function main(): Promise<void> {
 
     for (let i = 0; i < projects.length; i++) {
       const project = projects[i];
+      if (!project) continue;
+
       progressBar.update(i, { project: project.full_name });
 
       try {
@@ -292,11 +296,14 @@ async function getAllFiles(
     const itemPath = path ? `${path}/${item.name}` : item.name;
 
     if (item.type === "file") {
-      files.push({
+      const fileInfo: FileInfo = {
         path: itemPath,
-        size: item.size,
         type: item.type,
-      });
+      };
+      if (item.size !== undefined) {
+        fileInfo.size = item.size;
+      }
+      files.push(fileInfo);
     } else if (item.type === "dir") {
       try {
         const subContents = await githubClient.getRepositoryContents(
@@ -388,7 +395,7 @@ function aggregateIssueCategories(
     for (const [category, count] of Object.entries(
       result.statistics.categories
     )) {
-      categories[category] = (categories[category] || 0) + count;
+      categories[category] = (categories[category] ?? 0) + count;
     }
   }
 
@@ -404,7 +411,7 @@ function aggregateIssueSeverity(
 
   for (const result of results) {
     for (const [level, count] of Object.entries(result.statistics.severity)) {
-      severity[level] = (severity[level] || 0) + count;
+      severity[level] = (severity[level] ?? 0) + count;
     }
   }
 
@@ -418,7 +425,7 @@ function getTopIssues(
 
   for (const result of results) {
     for (const [type, count] of Object.entries(result.statistics.issueTypes)) {
-      issueTypes[type] = (issueTypes[type] || 0) + count;
+      issueTypes[type] = (issueTypes[type] ?? 0) + count;
     }
   }
 
@@ -430,7 +437,7 @@ function getTopIssues(
 
 function displayResults(
   summary: AnalysisSummary,
-  results: ProjectAnalysisResult[],
+  _results: ProjectAnalysisResult[],
   errors: AnalysisError[]
 ): void {
   console.log(chalk.blue.bold("\n📊 Analysis Results:"));

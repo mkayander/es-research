@@ -1,11 +1,7 @@
 import { promises as fs } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { dirname } from "path";
 import { createObjectCsvWriter } from "csv-writer";
 import yaml from "js-yaml";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 export interface ConfidenceInterval {
   lower: number;
@@ -15,8 +11,8 @@ export interface ConfidenceInterval {
 
 export interface PackageJsonInfo {
   hasNextJS: boolean;
-  nextVersion?: string;
-  reactVersion?: string;
+  nextVersion?: string | undefined;
+  reactVersion?: string | undefined;
   scripts?: Record<string, string>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
@@ -144,8 +140,7 @@ export function createCsvWriter(filePath: string, headers: string[]) {
  */
 export function calculateConfidenceInterval(
   successes: number,
-  total: number,
-  confidenceLevel = 0.95
+  total: number
 ): ConfidenceInterval {
   if (total === 0) return { lower: 0, upper: 0, margin: 0 };
 
@@ -164,10 +159,7 @@ export function calculateConfidenceInterval(
 /**
  * Calculate required sample size for given confidence level and margin of error
  */
-export function calculateRequiredSampleSize(
-  confidenceLevel = 0.95,
-  marginOfError = 0.05
-): number {
+export function calculateRequiredSampleSize(marginOfError = 0.05): number {
   const z = 1.96; // 95% confidence level
   const p = 0.5; // Conservative estimate
 
@@ -258,16 +250,16 @@ export function parsePackageJson(content: string): PackageJsonInfo {
       scripts?: Record<string, string>;
     };
 
-    const nextVersion = pkg.dependencies?.next || pkg.devDependencies?.next;
-    const reactVersion = pkg.dependencies?.react || pkg.devDependencies?.react;
+    const nextVersion = pkg.dependencies?.next ?? pkg.devDependencies?.next;
+    const reactVersion = pkg.dependencies?.react ?? pkg.devDependencies?.react;
 
     return {
       hasNextJS: !!nextVersion,
       nextVersion,
       reactVersion,
-      scripts: pkg.scripts || {},
-      dependencies: pkg.dependencies || {},
-      devDependencies: pkg.devDependencies || {},
+      scripts: pkg.scripts ?? {},
+      dependencies: pkg.dependencies ?? {},
+      devDependencies: pkg.devDependencies ?? {},
     };
   } catch (error) {
     return {
@@ -283,7 +275,7 @@ export function parsePackageJson(content: string): PackageJsonInfo {
 export function parseRepositoryName(fullName: string): RepositoryInfo {
   const parts = fullName.split("/");
   return {
-    owner: parts[0],
-    name: parts[1],
+    owner: parts[0] ?? "",
+    name: parts[1] ?? "",
   };
 }
