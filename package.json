@@ -1,16 +1,43 @@
 {
   "name": "es-research",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Research project to analyze NextJS projects for invalid JavaScript syntax using es-guard",
+  "main": "dist/index.js",
+  "type": "module",
   "scripts": {
+    "build": "bunx tsc",
+    "start": "bun run dist/index.js",
+    "fetch": "bun run dist/fetch-projects.js",
+    "analyze": "bun run dist/analyze-projects.js",
+    "report": "bun run dist/generate-report.js",
+    "research": "bun run dist/index.js research",
+    "dev": "bun run --watch src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "nextjs",
+    "javascript",
+    "es-guard",
+    "research",
+    "analysis"
+  ],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.12.4",
+  "packageManager": "bun@1.0.0",
+  "dependencies": {
+    "octokit": "^4.0.2",
+    "axios": "^1.6.2",
+    "commander": "^11.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^7.0.1",
+    "cli-progress": "^3.12.0",
+    "csv-writer": "^1.6.0",
+    "js-yaml": "^4.1.0",
+    "dotenv": "^16.3.1"
+  },
   "devDependencies": {
-    "es-guard": "^1.9.0"
+    "es-guard": "^1.9.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
   }
 }
