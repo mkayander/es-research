@@ -404,13 +404,13 @@ describe("ESGuardAnalyzer", () => {
   });
 
   describe("detectProjectConfiguration", () => {
-    test("should attempt to detect project configuration", async () => {
+    test("should attempt to detect project configuration", () => {
       // This test will depend on whether there's a project configuration to detect
       // The method returns a Promise<Config | null>
       const result = analyzer.detectProjectConfiguration("./");
 
       // The actual result might be null if no config is detected, or a config object
-      const config = await result;
+      const config = result;
       expect(config === null || typeof config === "object").toBe(true);
     });
   });

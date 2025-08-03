@@ -235,9 +235,10 @@ program
       console.log(chalk.green("✅ Configuration is valid"));
 
       // Check es-guard availability
+      console.log(chalk.blue("\n🔍 Checking es-guard availability..."));
       const { ESGuardAnalyzer } = await import("./es-guard-analyzer.ts");
       const analyzer = new ESGuardAnalyzer();
-      const esGuardAvailable = await analyzer.checkESGuardAvailability();
+      const esGuardAvailable = analyzer.checkESGuardAvailability();
 
       if (esGuardAvailable) {
         console.log(chalk.green("✅ es-guard is available"));

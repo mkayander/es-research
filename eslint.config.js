@@ -63,7 +63,7 @@ export default [
       "@typescript-eslint/no-import-type-side-effects": "error",
 
       // General code quality
-      "no-console": "warn",
+      "no-console": "off",
       "no-debugger": "error",
       "no-alert": "error",
       "no-var": "error",

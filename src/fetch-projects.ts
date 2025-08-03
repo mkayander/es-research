@@ -28,7 +28,6 @@ interface ProjectsData {
     sampledProjects: number;
     sampleSize: number;
     searchCriteria: {
-      language: string;
       framework: string;
       minStars: number;
       minForks: number;
@@ -68,9 +67,17 @@ async function main(): Promise<void> {
     const spinner = ora("Searching for NextJS projects...").start();
 
     const startTime = Date.now();
-    const projects = await githubClient.searchNextJSProjects(
-      config.research.sampleSize
-    );
+    let projects: GitHubRepository[] = [];
+
+    try {
+      projects = await githubClient.searchNextJSProjects(
+        config.research.sampleSize
+      );
+    } catch (error) {
+      spinner.fail("Failed to search for projects");
+      throw error;
+    }
+
     const endTime = Date.now();
 
     spinner.succeed(
@@ -79,32 +86,15 @@ async function main(): Promise<void> {
       )}`
     );
 
-    // Filter and validate projects
+    // Projects are already filtered by search criteria, just sort and sample
     console.log(chalk.blue("\n📊 Project Statistics:"));
     console.log(chalk.gray(`Total projects found: ${projects.length}`));
 
-    const validProjects = projects.filter((project) => {
-      return (
-        project.stargazers_count >= config.research.searchCriteria.minStars &&
-        project.forks_count >= config.research.searchCriteria.minForks
-      );
-    });
-
-    console.log(
-      chalk.gray(`Projects meeting criteria: ${validProjects.length}`)
-    );
-    console.log(
-      chalk.gray(`Min stars: ${config.research.searchCriteria.minStars}`)
-    );
-    console.log(
-      chalk.gray(`Min forks: ${config.research.searchCriteria.minForks}`)
-    );
-
     // Sort by popularity (stars)
-    validProjects.sort((a, b) => b.stargazers_count - a.stargazers_count);
+    projects.sort((a, b) => b.stargazers_count - a.stargazers_count);
 
     // Take the top projects up to sample size
-    const sampledProjects = validProjects.slice(0, config.research.sampleSize);
+    const sampledProjects = projects.slice(0, config.research.sampleSize);
 
     console.log(
       chalk.green(
@@ -117,7 +107,7 @@ async function main(): Promise<void> {
     const projectsData: ProjectsData = {
       metadata: {
         totalFound: projects.length,
-        validProjects: validProjects.length,
+        validProjects: projects.length,
         sampledProjects: sampledProjects.length,
         sampleSize: config.research.sampleSize,
         searchCriteria: config.research.searchCriteria,
@@ -184,13 +174,61 @@ async function main(): Promise<void> {
 }
 
 function generateProjectStats(projects: GitHubRepository[]): ProjectStats {
+  if (projects.length === 0) {
+    return {
+      totalProjects: 0,
+      avgStars: 0,
+      avgForks: 0,
+      minStars: 0,
+      maxStars: 0,
+      minForks: 0,
+      maxForks: 0,
+      oldestDate: "",
+      newestDate: "",
+      languages: [],
+      starDistribution: {
+        "0-100": 0,
+        "101-500": 0,
+        "501-1000": 0,
+        "1001-5000": 0,
+        "5000+": 0,
+      },
+      forkDistribution: {
+        "0-10": 0,
+        "11-50": 0,
+        "51-100": 0,
+        "101-500": 0,
+        "500+": 0,
+      },
+    };
+  }
+
   const stars = projects.map((p) => p.stargazers_count);
   const forks = projects.map((p) => p.forks_count);
-  const dates = projects.map((p) => new Date(p.created_at));
+
+  // Safely parse dates, filtering out invalid ones
+  const validDates = projects
+    .map((p) => p.created_at)
+    .filter((dateStr) => dateStr && dateStr.trim() !== "")
+    .map((dateStr) => new Date(dateStr))
+    .filter((date) => !isNaN(date.getTime()));
 
   const languages = [
     ...new Set(projects.map((p) => p.language).filter(Boolean) as string[]),
   ];
+
+  const oldestDate =
+    validDates.length > 0
+      ? new Date(Math.min(...validDates.map((d) => d.getTime())))
+          .toISOString()
+          .split("T")[0] ?? ""
+      : "";
+  const newestDate =
+    validDates.length > 0
+      ? new Date(Math.max(...validDates.map((d) => d.getTime())))
+          .toISOString()
+          .split("T")[0] ?? ""
+      : "";
 
   return {
     totalProjects: projects.length,
@@ -200,14 +238,8 @@ function generateProjectStats(projects: GitHubRepository[]): ProjectStats {
     maxStars: Math.max(...stars),
     minForks: Math.min(...forks),
     maxForks: Math.max(...forks),
-    oldestDate:
-      new Date(Math.min(...dates.map((d) => d.getTime())))
-        .toISOString()
-        .split("T")[0] ?? "",
-    newestDate:
-      new Date(Math.max(...dates.map((d) => d.getTime())))
-        .toISOString()
-        .split("T")[0] ?? "",
+    oldestDate,
+    newestDate,
     languages,
     starDistribution: {
       "0-100": stars.filter((s) => s <= 100).length,

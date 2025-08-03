@@ -132,7 +132,7 @@ describe("Integration Tests", () => {
       const issues = [
         {
           category: "compatibility",
-          severity: "error",
+          severity: "error" as const,
           type: "syntax",
           message: "Error 1",
         },
@@ -219,6 +219,8 @@ describe("Integration Tests", () => {
       expect(config.analysis.concurrency).toBeLessThan(20);
       expect(config.analysis.maxFileSize).toBeGreaterThan(1024);
       expect(config.analysis.maxFileSize).toBeLessThan(10 * 1024 * 1024);
+
+
     });
   });
 
@@ -288,7 +290,7 @@ describe("Integration Tests", () => {
       const issues = [
         {
           category: "compatibility",
-          severity: "error",
+          severity: "error" as const,
           type: "syntax",
           message: "Test error",
         },

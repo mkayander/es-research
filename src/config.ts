@@ -14,7 +14,6 @@ export interface GitHubConfig {
 }
 
 export interface SearchCriteria {
-  language: string;
   framework: string;
   minStars: number;
   minForks: number;
@@ -69,7 +68,6 @@ export const config: Config = {
 
     // GitHub search criteria
     searchCriteria: {
-      language: "javascript",
       framework: "nextjs",
       minStars: 100, // Minimum stars to consider "popular"
       minForks: 10, // Minimum forks as engagement indicator
