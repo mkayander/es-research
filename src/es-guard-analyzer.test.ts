@@ -1,7 +1,12 @@
 import { expect, test, describe, beforeEach, afterEach } from "bun:test";
 import { promises as fs } from "fs";
 import { join } from "path";
-import { ESGuardAnalyzer, type FileToAnalyze } from "./es-guard-analyzer.js";
+import {
+  ESGuardAnalyzer,
+  type FileAnalysisResult,
+  type ESGuardIssue,
+  type FileToAnalyze,
+} from "./es-guard-analyzer.js";
 import type { GitHubRepository } from "./github-client.js";
 
 describe("ESGuardAnalyzer", () => {
@@ -51,7 +56,7 @@ describe("ESGuardAnalyzer", () => {
     });
 
     test("should summarize issues with different severities", () => {
-      const issues = [
+      const issues: ESGuardIssue[] = [
         {
           category: "compatibility",
           severity: "error",
@@ -93,7 +98,7 @@ describe("ESGuardAnalyzer", () => {
     });
 
     test("should handle issues with missing properties", () => {
-      const issues = [
+      const issues: ESGuardIssue[] = [
         { message: "Issue 1" }, // Missing category and severity
         { category: "test", message: "Issue 2" }, // Missing severity
         { severity: "error", message: "Issue 3" }, // Missing category
@@ -133,7 +138,7 @@ describe("ESGuardAnalyzer", () => {
     });
 
     test("should aggregate project statistics correctly", () => {
-      const mockResults = [
+      const mockResults: FileAnalysisResult[] = [
         {
           filePath: "file1.js",
           hasIssues: true,
@@ -211,8 +216,8 @@ describe("ESGuardAnalyzer", () => {
   });
 
   describe("checkESGuardAvailability", () => {
-    test("should check es-guard availability", async () => {
-      const isAvailable = await analyzer.checkESGuardAvailability();
+    test("should check es-guard availability", () => {
+      const isAvailable = analyzer.checkESGuardAvailability();
 
       // This test will pass if es-guard is available, fail if not
       // The actual result depends on whether es-guard is installed
@@ -270,6 +275,8 @@ describe("ESGuardAnalyzer", () => {
     const mockProject: GitHubRepository = {
       id: 12345,
       full_name: "test-owner/test-repo",
+      clone_url: "https://github.com/test-owner/test-repo.git",
+      default_branch: "main",
       name: "test-repo",
       description: "Test repository",
       stargazers_count: 100,
@@ -444,6 +451,8 @@ describe("ESGuardAnalyzer", () => {
       const mockProject: GitHubRepository = {
         id: 12345,
         full_name: "test-owner/test-repo",
+        clone_url: "https://github.com/test-owner/test-repo.git",
+        default_branch: "main",
         name: "test-repo",
         description: "Test repository",
         stargazers_count: 100,

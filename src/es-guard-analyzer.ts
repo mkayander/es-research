@@ -5,6 +5,7 @@ import {
   validateConfig,
   type Config,
   type CompatibilityResult,
+  type DetectionResult,
 } from "es-guard";
 import { config } from "./config.js";
 import { sleep } from "./utils.js";
@@ -59,6 +60,8 @@ export interface ProjectAnalysisResult {
     language: string | null;
     created_at: string;
     updated_at: string;
+    clone_url: string;
+    default_branch: string;
   };
   analysis: {
     totalFiles: number;
@@ -221,7 +224,6 @@ export class ESGuardAnalyzer {
         issues.push({
           category: "compatibility",
           severity: "error",
-          type: message.type ?? "unknown",
           message: message.message,
           line: message.line,
           column: message.column,
@@ -236,7 +238,6 @@ export class ESGuardAnalyzer {
         issues.push({
           category: "compatibility",
           severity: "warning",
-          type: message.type ?? "unknown",
           message: message.message,
           line: message.line,
           column: message.column,
@@ -357,6 +358,8 @@ export class ESGuardAnalyzer {
         language: project.language,
         created_at: project.created_at,
         updated_at: project.updated_at,
+        clone_url: project.clone_url,
+        default_branch: project.default_branch,
       },
       analysis: {
         totalFiles: files.length,
@@ -404,9 +407,8 @@ export class ESGuardAnalyzer {
 
       // Aggregate severity
       for (const [severity, count] of Object.entries(result.summary.severity)) {
-        stats.severity[severity as keyof typeof stats.severity] =
-          (stats.severity[severity as keyof typeof stats.severity] ?? 0) +
-          count;
+        const severityKey = severity as keyof typeof stats.severity;
+        stats.severity[severityKey] += count;
       }
 
       // Aggregate issue types
@@ -445,9 +447,10 @@ export class ESGuardAnalyzer {
   /**
    * Get project configuration using es-guard's auto-detection
    */
-  detectProjectConfiguration(projectPath: string): Promise<Config | null> {
+  detectProjectConfiguration(projectPath: string): DetectionResult | null {
     try {
       const detectedConfig = detectProjectConfig(projectPath);
+
       return detectedConfig;
     } catch (error) {
       console.error(
@@ -472,7 +475,7 @@ export class ESGuardAnalyzer {
 
       // Perform analysis with custom config
       const tempDir = `temp_${Date.now()}`;
-      const fileName = filePath.split("/").pop() || "file.js";
+      const fileName = filePath.split("/").pop() ?? "file.js";
 
       const fs = await import("fs/promises");
       const path = await import("path");
