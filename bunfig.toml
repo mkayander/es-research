@@ -7,7 +7,6 @@ exact = true
 
 [test]
 # Test configuration
-preload = ["./src/test-setup.ts"]
 
 [run]
 # Runtime configuration

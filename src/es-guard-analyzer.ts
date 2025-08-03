@@ -1,4 +1,11 @@
-import { spawn } from "child_process";
+import {
+  checkCompatibility,
+  detectProjectConfig,
+  getBrowserTargetsFromString,
+  validateConfig,
+  type Config,
+  type CompatibilityResult,
+} from "es-guard";
 import { config } from "./config.js";
 import { sleep } from "./utils.js";
 import type { GitHubRepository } from "./github-client.js";
@@ -10,6 +17,7 @@ export interface ESGuardIssue {
   message?: string;
   line?: number;
   column?: number;
+  file?: string;
 }
 
 export interface ESGuardResult {
@@ -79,20 +87,26 @@ export interface ProjectStatistics {
 
 export class ESGuardAnalyzer {
   private timeout: number;
+  private defaultConfig: Config;
 
   constructor() {
     this.timeout = config.analysis.analysisTimeout;
+    this.defaultConfig = {
+      dir: "temp", // Will be overridden for individual files
+      target: "2020",
+      browsers: "> 1%, last 2 versions, not dead",
+    };
   }
 
   /**
-   * Analyze a JavaScript file using es-guard
+   * Analyze a JavaScript file using es-guard programmatic API
    */
   async analyzeFile(
     filePath: string,
     content: string
   ): Promise<FileAnalysisResult> {
     try {
-      const result = await this.runESGuard(content);
+      const result = await this.runESGuard(filePath, content);
 
       return {
         filePath,
@@ -118,60 +132,120 @@ export class ESGuardAnalyzer {
   }
 
   /**
-   * Run es-guard on content
+   * Run es-guard programmatically on content
    */
-  async runESGuard(content: string): Promise<ESGuardResult> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        child.kill("SIGTERM");
+  async runESGuard(filePath: string, content: string): Promise<ESGuardResult> {
+    // Create a temporary file-like structure for analysis
+    const tempDir = `temp_${Date.now()}`;
+    const fileName = filePath.split("/").pop() ?? "file.js";
+
+    // Use a timeout wrapper for the analysis
+    const analysisPromise = this.performAnalysis(tempDir, fileName, content);
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
         reject(new Error("Analysis timeout"));
       }, this.timeout);
-
-      const child = spawn("npx", ["es-guard", "--json"], {
-        stdio: ["pipe", "pipe", "pipe"],
-        shell: true,
-      });
-
-      let stdout = "";
-      let stderr = "";
-
-      child.stdout.on("data", (data) => {
-        stdout += data.toString();
-      });
-
-      child.stderr.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      child.on("close", (code) => {
-        clearTimeout(timeout);
-
-        if (code !== 0) {
-          reject(new Error(`es-guard failed with code ${code}: ${stderr}`));
-          return;
-        }
-
-        try {
-          const result = JSON.parse(stdout) as ESGuardResult;
-          resolve(result);
-        } catch (error) {
-          reject(
-            new Error(
-              `Failed to parse es-guard output: ${(error as Error).message}`
-            )
-          );
-        }
-      });
-
-      child.on("error", (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-
-      // Send content to es-guard
-      child.stdin.write(content);
-      child.stdin.end();
     });
+
+    try {
+      const compatibilityResult = await Promise.race([
+        analysisPromise,
+        timeoutPromise,
+      ]);
+      return this.convertCompatibilityResult(compatibilityResult, filePath);
+    } catch (error) {
+      throw new Error(`ES-Guard analysis failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Perform the actual es-guard analysis
+   */
+  private async performAnalysis(
+    tempDir: string,
+    fileName: string,
+    content: string
+  ): Promise<CompatibilityResult> {
+    // Create a virtual file system approach by writing content to a temporary location
+    // For now, we'll use a simplified approach that works with the programmatic API
+    const config: Config = {
+      ...this.defaultConfig,
+      dir: tempDir,
+    };
+
+    // Since es-guard programmatic API expects files on disk, we'll use a different approach
+    // We'll create a temporary file and analyze it
+    const fs = await import("fs/promises");
+    const path = await import("path");
+
+    try {
+      // Create temp directory
+      await fs.mkdir(tempDir, { recursive: true });
+
+      // Write content to temp file
+      const tempFilePath = path.join(tempDir, fileName);
+      await fs.writeFile(tempFilePath, content, "utf8");
+
+      // Run es-guard analysis
+      const result = await checkCompatibility(config);
+
+      // Clean up temp directory
+      await fs.rm(tempDir, { recursive: true, force: true });
+
+      return result;
+    } catch (error) {
+      // Clean up on error
+      try {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      } catch (_cleanupError) {
+        console.warn("Error cleaning up temp directory:", _cleanupError);
+        // Ignore cleanup errors
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Convert es-guard CompatibilityResult to our ESGuardResult format
+   */
+  private convertCompatibilityResult(
+    compatibilityResult: CompatibilityResult,
+    filePath: string
+  ): ESGuardResult {
+    const issues: ESGuardIssue[] = [];
+
+    // Convert errors
+    for (const violation of compatibilityResult.errors) {
+      for (const message of violation.messages) {
+        issues.push({
+          category: "compatibility",
+          severity: "error",
+          type: message.type ?? "unknown",
+          message: message.message,
+          line: message.line,
+          column: message.column,
+          file: filePath,
+        });
+      }
+    }
+
+    // Convert warnings
+    for (const violation of compatibilityResult.warnings) {
+      for (const message of violation.messages) {
+        issues.push({
+          category: "compatibility",
+          severity: "warning",
+          type: message.type ?? "unknown",
+          message: message.message,
+          line: message.line,
+          column: message.column,
+          file: filePath,
+        });
+      }
+    }
+
+    return { issues };
   }
 
   /**
@@ -195,7 +269,7 @@ export class ESGuardAnalyzer {
 
       // Count by severity
       const severity = issue.severity ?? "info";
-      summary.severity[severity] = (summary.severity[severity] ?? 0) + 1;
+      summary.severity[severity] = summary.severity[severity] + 1;
     }
 
     return summary;
@@ -346,15 +420,109 @@ export class ESGuardAnalyzer {
   }
 
   /**
-   * Check if es-guard is available
+   * Check if es-guard is available using programmatic API
    */
-  async checkESGuardAvailability(): Promise<boolean> {
+  checkESGuardAvailability(): boolean {
     try {
-      await this.runESGuard('console.log("test");');
+      // Test with a simple configuration validation
+      const testConfig: Config = {
+        dir: "test",
+        target: "2020",
+      };
+
+      validateConfig(testConfig);
+
+      // Test browser targets function
+      getBrowserTargetsFromString("2020");
+
       return true;
     } catch (error) {
       console.error("es-guard is not available:", (error as Error).message);
       return false;
+    }
+  }
+
+  /**
+   * Get project configuration using es-guard's auto-detection
+   */
+  detectProjectConfiguration(projectPath: string): Promise<Config | null> {
+    try {
+      const detectedConfig = detectProjectConfig(projectPath);
+      return detectedConfig;
+    } catch (error) {
+      console.error(
+        "Failed to detect project configuration:",
+        (error as Error).message
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Analyze with custom configuration
+   */
+  async analyzeWithCustomConfig(
+    filePath: string,
+    content: string,
+    customConfig: Config
+  ): Promise<FileAnalysisResult> {
+    try {
+      // Validate the custom configuration
+      validateConfig(customConfig);
+
+      // Perform analysis with custom config
+      const tempDir = `temp_${Date.now()}`;
+      const fileName = filePath.split("/").pop() || "file.js";
+
+      const fs = await import("fs/promises");
+      const path = await import("path");
+
+      try {
+        await fs.mkdir(tempDir, { recursive: true });
+        const tempFilePath = path.join(tempDir, fileName);
+        await fs.writeFile(tempFilePath, content, "utf8");
+
+        const result = await checkCompatibility({
+          ...customConfig,
+          dir: tempDir,
+        });
+
+        await fs.rm(tempDir, { recursive: true, force: true });
+
+        const convertedResult = this.convertCompatibilityResult(
+          result,
+          filePath
+        );
+
+        return {
+          filePath,
+          hasIssues: convertedResult.issues.length > 0,
+          issues: convertedResult.issues,
+          summary: this.summarizeIssues(convertedResult.issues),
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        try {
+          await fs.rm(tempDir, { recursive: true, force: true });
+        } catch (cleanupError) {
+          console.warn("Error cleaning up temp directory:", cleanupError);
+          // Ignore cleanup errors
+        }
+        throw error;
+      }
+    } catch (error) {
+      return {
+        filePath,
+        hasIssues: false,
+        error: (error as Error).message,
+        issues: [],
+        summary: {
+          total: 0,
+          categories: {},
+          severity: { error: 0, warning: 0, info: 0 },
+        },
+        timestamp: new Date().toISOString(),
+      };
     }
   }
 }

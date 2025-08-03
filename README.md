@@ -1,6 +1,6 @@
 # ES-Research: NextJS Projects JavaScript Syntax Analysis
 
-A comprehensive research tool for analyzing the prevalence of invalid JavaScript syntax in NextJS projects using the [es-guard](https://github.com/your-username/es-guard) tool.
+A comprehensive research tool for analyzing the prevalence of invalid JavaScript syntax in NextJS projects using the [es-guard](https://github.com/mkayander/es-guard) tool.
 
 ## 🎯 Research Objective
 
@@ -222,7 +222,7 @@ This project is licensed under the ISC License.
 
 ## 🙏 Acknowledgments
 
-- [es-guard](https://github.com/your-username/es-guard) for JavaScript syntax analysis
+- [es-guard](https://github.com/mkayander/es-guard) for JavaScript syntax analysis
 - GitHub API for project discovery
 - The NextJS community for the projects analyzed
 

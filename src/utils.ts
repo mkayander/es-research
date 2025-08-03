@@ -201,9 +201,12 @@ export function generateId(): string {
  */
 export function matchesPattern(filePath: string, patterns: string[]): boolean {
   return patterns.some((pattern) => {
-    const regex = new RegExp(
-      pattern.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*")
-    );
+    // Convert glob pattern to regex
+    let regexPattern = pattern
+      .replace(/\*\*/g, ".*") // ** becomes .*
+      .replace(/\*/g, "[^/]*"); // * becomes [^/]*
+
+    const regex = new RegExp(regexPattern);
     return regex.test(filePath);
   });
 }
@@ -274,6 +277,12 @@ export function parsePackageJson(content: string): PackageJsonInfo {
  */
 export function parseRepositoryName(fullName: string): RepositoryInfo {
   const parts = fullName.split("/");
+  if (parts.length === 1) {
+    return {
+      owner: "",
+      name: parts[0] ?? "",
+    };
+  }
   return {
     owner: parts[0] ?? "",
     name: parts[1] ?? "",
