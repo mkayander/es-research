@@ -1,0 +1,178 @@
+# ES-Research Project Rules and Conventions
+
+## Project Overview
+
+This is a TypeScript research tool for analyzing NextJS projects using es-guard to detect invalid JavaScript syntax. The project follows strict TypeScript practices, uses Bun as the runtime, and implements comprehensive research methodology.
+
+## Core Technologies & Dependencies
+
+- **Runtime**: Bun (JavaScript runtime with built-in bundler)
+- **Language**: TypeScript with strict configuration
+- **Module System**: ES Modules with `.js` extensions for imports
+- **Package Manager**: Bun (never use npm)
+- **Testing**: Bun test framework
+- **Linting**: ESLint with TypeScript rules
+
+## TypeScript Configuration
+
+- **Target**: ESNext
+- **Module**: NodeNext
+- **Strict Mode**: Enabled with all strict flags
+- **No Unused Variables**: Error on unused locals/parameters (use `_` prefix to ignore)
+- **No Implicit Any**: Always require explicit types
+- **No Non-null Assertion**: Never use `!` operator
+- **Consistent Type Imports**: Use `import type` for type-only imports
+- **Allow Importing TS Extensions**: Use `.js` extensions in imports for ES modules
+
+## Code Style & Architecture
+
+- **File Naming**: kebab-case for files, PascalCase for classes, camelCase for functions/variables
+- **Import Organization**: Group imports by type (external, internal, types)
+- **Export Patterns**: Use named exports, avoid default exports
+- **Error Handling**: Comprehensive error handling with proper typing
+- **Async/Await**: Always use async/await, never use raw promises
+- **Type Safety**: Never use `as any`, `as unknown`, or type assertions to bypass TS errors
+
+## Project Structure
+
+```
+src/
+├── config.ts              # Configuration and research parameters
+├── github-client.ts       # GitHub API client with rate limiting
+├── es-guard-analyzer.ts   # es-guard integration and analysis
+├── fetch-projects.ts      # Project discovery and collection
+├── analyze-projects.ts    # Main analysis pipeline
+├── generate-report.ts     # Report generation
+├── utils.ts               # Utility functions
+└── index.ts               # CLI entry point
+```
+
+## CLI Architecture
+
+- **Entry Point**: `src/index.ts` with shebang `#!/usr/bin/env bun`
+- **Framework**: Commander.js for CLI argument parsing
+- **Commands**: fetch, analyze, report, research (pipeline)
+- **Options**: Configurable via command line with defaults from config.ts
+- **Error Handling**: Graceful error handling with colored output using chalk
+
+## Configuration Management
+
+- **Environment**: Use dotenv for environment variables
+- **Validation**: Always validate configuration before use
+- **Type Safety**: Strongly typed configuration interfaces
+- **Defaults**: Sensible defaults with command-line overrides
+- **Research Parameters**: Configurable sample size, confidence levels, search criteria
+
+## GitHub API Integration
+
+- **Client**: Octokit with rate limiting
+- **Rate Limiting**: Respect GitHub API limits with exponential backoff
+- **Search Strategies**: Multiple search approaches (framework, package.json, keywords)
+- **Error Handling**: Comprehensive error handling for API failures
+- **Project Filtering**: Exclude official/framework projects (vercel/next.js, etc.)
+
+## Research Methodology
+
+- **Statistical Approach**: 95% confidence level, 5% margin of error
+- **Sample Size**: Configurable (default 1000 projects)
+- **Selection Criteria**: Minimum stars/forks, creation date filters
+- **Multi-strategy Search**: Framework-based, package.json, keyword-based
+- **Validation**: Verify projects actually use NextJS dependencies
+
+## Analysis Pipeline
+
+- **File Discovery**: Recursive traversal with pattern matching
+- **Size Limits**: Maximum file size (1MB) and file count (100) per project
+- **Concurrency**: Configurable parallel processing
+- **es-guard Integration**: Syntax analysis with timeout handling
+- **Data Collection**: Structured data collection with error tracking
+
+## Testing Strategy
+
+- **Framework**: Bun test with TypeScript support
+- **Coverage**: Unit tests for utilities, integration tests for main flows
+- **Mocking**: Minimal mocking, prefer real dependencies
+- **Test Files**: `*.test.ts` naming convention
+- **Test Configuration**: Separate tsconfig.test.json for test files
+
+## Error Handling & Logging
+
+- **Console Output**: Use chalk for colored, structured logging
+- **Error Types**: Proper error typing and categorization
+- **Graceful Degradation**: Continue processing on individual failures
+- **Progress Tracking**: Use cli-progress for long-running operations
+- **Debug Information**: Comprehensive logging for troubleshooting
+
+## Data Management
+
+- **Output Formats**: CSV, JSON, YAML, Markdown reports
+- **Data Validation**: Validate data integrity throughout pipeline
+- **Caching**: Temporary cache for API responses and analysis results
+- **File Organization**: Structured output directories (data/, reports/, cache/)
+- **Error Tracking**: Comprehensive error logging and reporting
+
+## Performance & Scalability
+
+- **Concurrency Control**: Configurable parallel processing limits
+- **Rate Limiting**: Respect external API limits
+- **Memory Management**: Process projects in batches
+- **Timeout Handling**: Configurable timeouts for long-running operations
+- **Resource Cleanup**: Proper cleanup of temporary files and connections
+
+## Security & Best Practices
+
+- **API Tokens**: Secure handling of GitHub tokens via environment variables
+- **Input Validation**: Validate all external inputs and configuration
+- **Rate Limiting**: Prevent API abuse through proper rate limiting
+- **Error Sanitization**: Don't expose sensitive information in error messages
+- **Dependency Management**: Use exact versions for reproducibility
+
+## Development Workflow
+
+- **Build**: `bun run build` (TypeScript compilation)
+- **Development**: `bun run dev` (watch mode)
+- **Testing**: `bun test` (run tests)
+- **Linting**: `bun run lint` (ESLint with TypeScript rules)
+- **Research Pipeline**: `bun run research` (complete analysis)
+
+## Import/Export Patterns
+
+```typescript
+// Use ES module imports with .js extensions
+import { config } from "./config.js";
+import type { GitHubRepository } from "./github-client.js";
+
+// Export interfaces and types
+export interface AnalysisResult {
+  // ...
+}
+
+// Export classes and functions
+export class ESGuardAnalyzer {
+  // ...
+}
+```
+
+## Never Do This
+
+- ❌ Use `npm` instead of `bun`
+- ❌ Use `as any` or type assertions to bypass TypeScript errors
+- ❌ Use non-null assertion operator (`!`)
+- ❌ Use `require()` instead of ES module imports
+- ❌ Skip error handling or type validation
+- ❌ Use default exports
+- ❌ Hardcode configuration values
+- ❌ Ignore rate limiting or API constraints
+
+## Always Do This
+
+- ✅ Use `bun` for all package management and runtime operations
+- ✅ Write comprehensive TypeScript types and interfaces
+- ✅ Handle errors gracefully with proper typing
+- ✅ Use ES module syntax with `.js` extensions
+- ✅ Validate configuration and inputs
+- ✅ Respect API rate limits and implement proper error handling
+- ✅ Write tests for new functionality
+- ✅ Use chalk for structured, colored console output
+- ✅ Follow the established project structure and naming conventions
+- ✅ Implement proper logging and progress tracking
