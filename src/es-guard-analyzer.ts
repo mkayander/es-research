@@ -103,6 +103,12 @@ export class ESGuardAnalyzer {
 
   /**
    * Analyze a JavaScript file using es-guard programmatic API
+   *
+   * Main logic:
+   * - Run es-guard on file content
+   * - Convert result to our format
+   * - Summarize issues
+   * - Return analysis result
    */
   async analyzeFile(
     filePath: string,
@@ -278,6 +284,11 @@ export class ESGuardAnalyzer {
 
   /**
    * Analyze multiple files with concurrency control
+   *
+   * Main logic:
+   * - Process files with concurrency limit
+   * - Aggregate results
+   * - Return analysis results
    */
   async analyzeFiles(
     files: FileToAnalyze[],
@@ -328,6 +339,11 @@ export class ESGuardAnalyzer {
 
   /**
    * Analyze a project's files
+   *
+   * Main logic:
+   * - Analyze files with concurrency control
+   * - Aggregate project-level statistics
+   * - Return analysis result
    */
   async analyzeProject(
     project: GitHubRepository,

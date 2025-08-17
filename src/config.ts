@@ -40,6 +40,7 @@ export interface AnalysisConfig {
   maxFileSize: number;
   analysisTimeout: number;
   concurrency: number;
+  maxProjectsToAnalyze: number;
 }
 
 export interface Config {
@@ -69,9 +70,9 @@ export const config: Config = {
     // GitHub search criteria
     searchCriteria: {
       framework: "nextjs",
-      minStars: 100, // Minimum stars to consider "popular"
-      minForks: 10, // Minimum forks as engagement indicator
-      createdAfter: "2020-01-01", // Focus on modern projects
+      minStars: 0, // Minimum stars to consider "popular"
+      minForks: 0, // Minimum forks as engagement indicator
+      createdAfter: "2010-01-01", // Focus on modern projects
     },
 
     // File patterns to analyze
@@ -113,6 +114,8 @@ export const config: Config = {
     analysisTimeout: 30000,
     // Concurrent analysis jobs
     concurrency: 5,
+    // Maximum number of projects to analyze (0 = analyze all)
+    maxProjectsToAnalyze: 0,
   },
 };
 
@@ -148,11 +151,11 @@ export function validateConfig(): boolean {
 
   // Search criteria validation
   const criteria = config.research.searchCriteria;
-  if (criteria.minStars <= 0) {
-    throw new Error("Minimum stars must be greater than 0");
+  if (criteria.minStars < 0) {
+    throw new Error("Minimum stars must be greater than or equal to 0");
   }
-  if (criteria.minForks <= 0) {
-    throw new Error("Minimum forks must be greater than 0");
+  if (criteria.minForks < 0) {
+    throw new Error("Minimum forks must be greater than or equal to 0");
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(criteria.createdAfter)) {
     throw new Error("Created after date must be in YYYY-MM-DD format");

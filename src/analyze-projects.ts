@@ -100,11 +100,26 @@ async function main(): Promise<void> {
     }
 
     const { projects } = projectsData;
-    console.log(chalk.blue(`📊 Analyzing ${projects.length} projects`));
+
+    // Apply project limit if configured
+    let projectsToAnalyze = projects;
+    if (config.analysis.maxProjectsToAnalyze > 0) {
+      projectsToAnalyze = projects.slice(
+        0,
+        config.analysis.maxProjectsToAnalyze
+      );
+      console.log(
+        chalk.blue(
+          `📊 Analyzing ${projectsToAnalyze.length} projects (limited from ${projects.length} total)`
+        )
+      );
+    } else {
+      console.log(chalk.blue(`📊 Analyzing ${projects.length} projects`));
+    }
 
     // Check es-guard availability
     const analyzer = new ESGuardAnalyzer();
-    const esGuardAvailable = await analyzer.checkESGuardAvailability();
+    const esGuardAvailable = analyzer.checkESGuardAvailability();
 
     if (!esGuardAvailable) {
       throw new Error("es-guard is not available. Please install it first.");
@@ -129,10 +144,10 @@ async function main(): Promise<void> {
       hideCursor: true,
     });
 
-    progressBar.start(projects.length, 0, { project: "Starting..." });
+    progressBar.start(projectsToAnalyze.length, 0, { project: "Starting..." });
 
-    for (let i = 0; i < projects.length; i++) {
-      const project = projects[i];
+    for (let i = 0; i < projectsToAnalyze.length; i++) {
+      const project = projectsToAnalyze[i];
       if (!project) continue;
 
       progressBar.update(i, { project: project.full_name });
@@ -180,11 +195,14 @@ async function main(): Promise<void> {
         totalProjects: projects.length,
         analyzedProjects: results.length,
         failedProjects: errors.length,
+        projectsAnalyzed: projectsToAnalyze.length,
+        maxProjectsToAnalyze: config.analysis.maxProjectsToAnalyze,
         timestamp: new Date().toISOString(),
         config: {
           sampleSize: config.research.sampleSize,
           maxFilesPerProject: config.analysis.maxFilesPerProject,
           maxFileSize: config.analysis.maxFileSize,
+          maxProjectsToAnalyze: config.analysis.maxProjectsToAnalyze,
         },
       },
       summary,
@@ -206,6 +224,16 @@ async function main(): Promise<void> {
   }
 }
 
+/**
+ * Main logic:
+ * - Get repository contents
+ * - Recursively get all files
+ * - Filter files for analysis
+ * - Limit files per project
+ * - Get file contents
+ * - Analyze with es-guard
+ * - Return analysis result
+ */
 async function analyzeProject(
   githubClient: GitHubClient,
   analyzer: ESGuardAnalyzer,

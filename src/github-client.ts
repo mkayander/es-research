@@ -53,6 +53,24 @@ export interface RateLimitInfo {
   };
 }
 
+/**
+ * Get list of projects to exclude from search results
+ * These are typically official/framework projects, not consumer projects
+ */
+const EXCLUDED_PROJECTS = new Set([
+  "vercel/next.js", // Official Next.js framework
+  "vercel/next-learn", // Official Next.js learning materials
+  "vercel/nextjs-examples", // Official Next.js examples
+  "zeit/next.js", // Legacy Next.js repository
+  "zeit/nextjs.org", // Legacy Next.js documentation
+  "zeit/next-learn", // Legacy Next.js learning materials
+  "zeit/nextjs-examples", // Legacy Next.js examples
+  "zeit/nextjs-blog", // Legacy Next.js blog
+  "nextjs/next.js", // Alternative Next.js repository
+  "nextjs/next-learn", // Alternative Next.js learning materials
+  "nextjs/nextjs-examples", // Alternative Next.js examples
+]);
+
 export class GitHubClient {
   private octokit: Octokit;
   private rateLimitInfo: RateLimitInfo | null;
@@ -476,20 +494,33 @@ export class GitHubClient {
       };
 
       // Look for NextJS package - only "next" is valid
-      const nextJSKeys = Object.keys(allDeps).filter((key) => key === "next");
-
-      if (nextJSKeys.length === 0) {
+      if (!("next" in allDeps)) {
         return { isValid: false, reason: "No NextJS dependencies found" };
       }
 
       // Get the NextJS version
-      const nextKey = nextJSKeys[0];
-      const nextVersion = nextKey ? allDeps[nextKey] : undefined;
+      const nextVersion = allDeps["next"];
+
+      // Check if next.config.[js,ts,mjs] exists
+      const extensions = ["js", "mjs", "ts"];
+      let nextConfig: string | null = null;
+      for (const extension of extensions) {
+        nextConfig = await this.getFileContent(
+          owner,
+          repo,
+          `next.config.${extension}`
+        );
+        if (nextConfig) break;
+      }
+
+      if (!nextConfig) {
+        return { isValid: false, reason: "No NextJS configuration found" };
+      }
 
       return {
         isValid: true,
         ...(nextVersion && { nextVersion }),
-        reason: `Found NextJS dependency: ${nextKey}@${nextVersion}`,
+        reason: `Found NextJS dependency: next@${nextVersion}`,
       };
     } catch (error) {
       return {
@@ -518,6 +549,12 @@ export class GitHubClient {
     for (let i = 0; i < projects.length; i += batchSize) {
       const batch = projects.slice(i, i + batchSize);
       const promises = batch.map(async (project) => {
+        console.log(project.full_name);
+        if (EXCLUDED_PROJECTS.has(project.full_name)) {
+          console.log(chalk.gray(`❌ ${project.full_name}: Excluded project`));
+          return null;
+        }
+
         const [owner, repo] = project.full_name.split("/");
         if (!owner || !repo) {
           console.log(

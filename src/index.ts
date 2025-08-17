@@ -75,11 +75,17 @@ program
     "Number of concurrent analyses",
     config.analysis.concurrency.toString()
   )
+  .option(
+    "--max-projects <number>",
+    "Maximum number of projects to analyze (0 = analyze all)",
+    config.analysis.maxProjectsToAnalyze.toString()
+  )
   .action(
     async (options: {
       maxFiles?: string;
       maxSize?: string;
       concurrency?: string;
+      maxProjects?: string;
     }) => {
       try {
         // Update config with command line options
@@ -89,6 +95,8 @@ program
           config.analysis.maxFileSize = parseInt(options.maxSize) * 1024 * 1024;
         if (options.concurrency)
           config.analysis.concurrency = parseInt(options.concurrency);
+        if (options.maxProjects)
+          config.analysis.maxProjectsToAnalyze = parseInt(options.maxProjects);
 
         validateConfig();
         await ensureDir(config.output.dataDir);
@@ -151,6 +159,11 @@ program
     "Number of concurrent analyses",
     config.analysis.concurrency.toString()
   )
+  .option(
+    "--max-projects <number>",
+    "Maximum number of projects to analyze (0 = analyze all)",
+    config.analysis.maxProjectsToAnalyze.toString()
+  )
   .action(
     async (options: {
       sampleSize?: string;
@@ -159,6 +172,7 @@ program
       maxFiles?: string;
       maxSize?: string;
       concurrency?: string;
+      maxProjects?: string;
     }) => {
       try {
         console.log(
@@ -179,6 +193,8 @@ program
           config.analysis.maxFileSize = parseInt(options.maxSize) * 1024 * 1024;
         if (options.concurrency)
           config.analysis.concurrency = parseInt(options.concurrency);
+        if (options.maxProjects)
+          config.analysis.maxProjectsToAnalyze = parseInt(options.maxProjects);
 
         validateConfig();
 
@@ -270,9 +286,11 @@ Examples:
   $ es-research fetch                    # Fetch 1000 projects (default)
   $ es-research fetch -s 500            # Fetch 500 projects
   $ es-research analyze                  # Analyze fetched projects
+  $ es-research analyze --max-projects 10 # Analyze only top 10 projects
   $ es-research report                   # Generate reports
   $ es-research research                 # Run complete pipeline
   $ es-research research -s 200         # Run with 200 projects
+  $ es-research research --max-projects 50 # Run with 200 projects, analyze top 50
   $ es-research config                   # Show configuration
   $ es-research validate                 # Validate setup
 
