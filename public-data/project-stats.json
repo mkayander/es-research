@@ -1,0 +1,30 @@
+{
+  "totalProjects": 589,
+  "avgStars": 1213.100169779287,
+  "avgForks": 341.3497453310696,
+  "minStars": 1,
+  "maxStars": 85489,
+  "minForks": 0,
+  "maxForks": 61083,
+  "oldestDate": "2016-10-29",
+  "newestDate": "2025-07-26",
+  "languages": [
+    "TypeScript",
+    "JavaScript",
+    "CSS"
+  ],
+  "starDistribution": {
+    "0-100": 356,
+    "101-500": 87,
+    "501-1000": 43,
+    "1001-5000": 65,
+    "5000+": 38
+  },
+  "forkDistribution": {
+    "0-10": 297,
+    "11-50": 97,
+    "51-100": 42,
+    "101-500": 92,
+    "500+": 61
+  }
+}
