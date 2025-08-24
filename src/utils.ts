@@ -1,5 +1,5 @@
-import { promises as fs } from "fs";
-import { dirname } from "path";
+import { promises as fs, existsSync } from "fs";
+import { dirname, join } from "path";
 import { createObjectCsvWriter } from "csv-writer";
 import yaml from "js-yaml";
 
@@ -27,6 +27,12 @@ export interface RepositoryInfo {
 export interface FileInfo {
   path: string;
   size?: number;
+}
+
+export interface PackageManagerInfo {
+  manager: "npm" | "yarn" | "pnpm" | "bun";
+  installCommand: string;
+  buildCommand: string;
 }
 
 /**
@@ -202,7 +208,7 @@ export function generateId(): string {
 export function matchesPattern(filePath: string, patterns: string[]): boolean {
   return patterns.some((pattern) => {
     // Convert glob pattern to regex
-    let regexPattern = pattern
+    const regexPattern = pattern
       .replace(/\*\*/g, ".*") // ** becomes .*
       .replace(/\*/g, "[^/]*"); // * becomes [^/]*
 
@@ -287,4 +293,39 @@ export function parseRepositoryName(fullName: string): RepositoryInfo {
     owner: parts[0] ?? "",
     name: parts[1] ?? "",
   };
+}
+
+/**
+ * Detect package manager based on lock files present in project directory
+ */
+export function detectPackageManager(projectDir: string): PackageManagerInfo {
+  // Check for lock files in order of preference
+  if (existsSync(join(projectDir, "bun.lockb"))) {
+    return {
+      manager: "bun",
+      installCommand: "bun install --frozen-lockfile",
+      buildCommand: "bun run build",
+    };
+  }
+
+  if (existsSync(join(projectDir, "pnpm-lock.yaml"))) {
+    return {
+      manager: "pnpm",
+      installCommand: "pnpm install --frozen-lockfile",
+      buildCommand: "pnpm run build",
+    };
+  }
+
+  if (existsSync(join(projectDir, "yarn.lock"))) {
+    return {
+      manager: "yarn",
+      installCommand: "yarn install --frozen-lockfile",
+      buildCommand: "yarn run build",
+    };
+  }
+
+  // Throw error if no lock file is found
+  throw new Error(
+    "No lock file found. Expected one of: bun.lockb, pnpm-lock.yaml, yarn.lock, or package-lock.json"
+  );
 }

@@ -20,7 +20,9 @@ import {
   parsePackageJson,
   parseRepositoryName,
   type FileInfo,
+  detectPackageManager,
 } from "./utils.js";
+import { tmpdir } from "os";
 
 describe("Utils", () => {
   const testDir = join(process.cwd(), "test-temp");
@@ -83,7 +85,7 @@ describe("Utils", () => {
     });
 
     test("should throw after max retries", async () => {
-      const fn = async () => {
+      const fn = () => {
         throw new Error("Persistent failure");
       };
 
@@ -456,5 +458,60 @@ describe("Utils", () => {
       expect(result.owner).toBe("");
       expect(result.name).toBe("");
     });
+  });
+});
+
+describe("detectPackageManager", () => {
+  const tempDir = join(tmpdir(), "es-research-test");
+
+  beforeEach(async () => {
+    await ensureDir(tempDir);
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  test("should detect bun when bun.lockb exists", async () => {
+    await fs.writeFile(join(tempDir, "bun.lockb"), "test");
+    const result = detectPackageManager(tempDir);
+    expect(result.manager).toBe("bun");
+    expect(result.installCommand).toBe("bun install --frozen-lockfile");
+    expect(result.buildCommand).toBe("bun run build");
+  });
+
+  test("should detect pnpm when pnpm-lock.yaml exists", async () => {
+    await fs.writeFile(join(tempDir, "pnpm-lock.yaml"), "test");
+    const result = detectPackageManager(tempDir);
+    expect(result.manager).toBe("pnpm");
+    expect(result.installCommand).toBe("pnpm install --frozen-lockfile");
+    expect(result.buildCommand).toBe("pnpm run build");
+  });
+
+  test("should detect yarn when yarn.lock exists", async () => {
+    await fs.writeFile(join(tempDir, "yarn.lock"), "test");
+    const result = detectPackageManager(tempDir);
+    expect(result.manager).toBe("yarn");
+    expect(result.installCommand).toBe("yarn install --frozen-lockfile");
+    expect(result.buildCommand).toBe("yarn run build");
+  });
+
+  test("should throw error when no lock file exists", () => {
+    expect(() => detectPackageManager(tempDir)).toThrow(
+      "No lock file found. Expected one of: bun.lockb, pnpm-lock.yaml, yarn.lock, or package-lock.json"
+    );
+  });
+
+  test("should prioritize bun over other lock files", async () => {
+    await fs.writeFile(join(tempDir, "bun.lockb"), "test");
+    await fs.writeFile(join(tempDir, "pnpm-lock.yaml"), "test");
+    await fs.writeFile(join(tempDir, "yarn.lock"), "test");
+
+    const result = detectPackageManager(tempDir);
+    expect(result.manager).toBe("bun");
   });
 });

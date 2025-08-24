@@ -12,6 +12,7 @@ import {
   ensureDir,
   parseRepositoryName,
   calculateConfidenceInterval,
+  detectPackageManager,
 } from "./utils.js";
 import chalk from "chalk";
 import cliProgress from "cli-progress";
@@ -286,18 +287,26 @@ async function buildNextJSProject(projectDir: string): Promise<void> {
     throw new Error("Not a NextJS project");
   }
 
-  console.log(chalk.gray(`    📦 Installing dependencies...`));
+  console.log(chalk.gray(`    🔎 Detecting package manager...`));
+
+  // Detect package manager
+  const packageManager = detectPackageManager(projectDir);
+  console.log(
+    chalk.gray(
+      `    📦 Using ${packageManager.manager} to install dependencies...`
+    )
+  );
 
   // Install dependencies
   try {
-    execSync("npm ci", {
+    execSync(packageManager.installCommand, {
       cwd: projectDir,
       stdio: "pipe",
       timeout: 300000, // 5 minutes timeout
     });
   } catch (error) {
     throw new Error(
-      `Failed to install dependencies: ${(error as Error).message}`
+      `Failed to install dependencies with ${packageManager.manager}: ${(error as Error).message}`
     );
   }
 
@@ -307,7 +316,7 @@ async function buildNextJSProject(projectDir: string): Promise<void> {
   try {
     // Check for build script
     if (packageData.scripts?.build) {
-      execSync("npm run build", {
+      execSync(packageManager.buildCommand, {
         cwd: projectDir,
         stdio: "pipe",
         timeout: 600000, // 10 minutes timeout for build
@@ -318,7 +327,9 @@ async function buildNextJSProject(projectDir: string): Promise<void> {
 
     console.log(chalk.gray(`    ✅ Build completed successfully`));
   } catch (error) {
-    throw new Error(`Build failed: ${(error as Error).message}`);
+    throw new Error(
+      `Build failed with ${packageManager.manager}: ${(error as Error).message}`
+    );
   }
 }
 
