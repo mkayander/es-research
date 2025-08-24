@@ -48,7 +48,7 @@ program
         validateConfig();
         await ensureDir(config.output.dataDir);
 
-        const { main: fetchMain } = await import("./fetch-projects.ts");
+        const { main: fetchMain } = await import("./fetch-projects.js");
         await fetchMain();
       } catch (error) {
         console.error(chalk.red("Error:", (error as Error).message));
@@ -61,54 +61,33 @@ program
   .command("analyze")
   .description("Analyze fetched projects with es-guard")
   .option(
-    "--max-files <number>",
-    "Maximum files per project",
-    config.analysis.maxFilesPerProject.toString()
-  )
-  .option(
-    "--max-size <number>",
-    "Maximum file size in MB",
-    (config.analysis.maxFileSize / 1024 / 1024).toString()
-  )
-  .option(
     "--concurrency <number>",
     "Number of concurrent analyses",
     config.analysis.concurrency.toString()
   )
   .option(
-    "--max-projects <number>",
+    "-c, --count <number>",
     "Maximum number of projects to analyze (0 = analyze all)",
     config.analysis.maxProjectsToAnalyze.toString()
   )
-  .action(
-    async (options: {
-      maxFiles?: string;
-      maxSize?: string;
-      concurrency?: string;
-      maxProjects?: string;
-    }) => {
-      try {
-        // Update config with command line options
-        if (options.maxFiles)
-          config.analysis.maxFilesPerProject = parseInt(options.maxFiles);
-        if (options.maxSize)
-          config.analysis.maxFileSize = parseInt(options.maxSize) * 1024 * 1024;
-        if (options.concurrency)
-          config.analysis.concurrency = parseInt(options.concurrency);
-        if (options.maxProjects)
-          config.analysis.maxProjectsToAnalyze = parseInt(options.maxProjects);
+  .action(async (options: { concurrency?: string; count?: string }) => {
+    try {
+      // Update config with command line options
+      if (options.concurrency)
+        config.analysis.concurrency = parseInt(options.concurrency);
+      if (options.count)
+        config.analysis.maxProjectsToAnalyze = parseInt(options.count);
 
-        validateConfig();
-        await ensureDir(config.output.dataDir);
+      validateConfig();
+      await ensureDir(config.output.dataDir);
 
-        const { main: analyzeMain } = await import("./analyze-projects.ts");
-        await analyzeMain();
-      } catch (error) {
-        console.error(chalk.red("Error:", (error as Error).message));
-        process.exit(1);
-      }
+      const { main: analyzeMain } = await import("./analyze-projects.js");
+      await analyzeMain();
+    } catch (error) {
+      console.error(chalk.red("Error:", (error as Error).message));
+      process.exit(1);
     }
-  );
+  });
 
 program
   .command("report")
@@ -118,7 +97,7 @@ program
       validateConfig();
       await ensureDir(config.output.reportsDir);
 
-      const { main: reportMain } = await import("./generate-report.ts");
+      const { main: reportMain } = await import("./generate-report.js");
       await reportMain();
     } catch (error) {
       console.error(chalk.red("Error:", (error as Error).message));
@@ -145,22 +124,12 @@ program
     config.research.searchCriteria.minForks.toString()
   )
   .option(
-    "--max-files <number>",
-    "Maximum files per project",
-    config.analysis.maxFilesPerProject.toString()
-  )
-  .option(
-    "--max-size <number>",
-    "Maximum file size in MB",
-    (config.analysis.maxFileSize / 1024 / 1024).toString()
-  )
-  .option(
     "--concurrency <number>",
     "Number of concurrent analyses",
     config.analysis.concurrency.toString()
   )
   .option(
-    "--max-projects <number>",
+    "-c, --count <number>",
     "Maximum number of projects to analyze (0 = analyze all)",
     config.analysis.maxProjectsToAnalyze.toString()
   )
@@ -169,10 +138,8 @@ program
       sampleSize?: string;
       minStars?: string;
       minForks?: string;
-      maxFiles?: string;
-      maxSize?: string;
       concurrency?: string;
-      maxProjects?: string;
+      count?: string;
     }) => {
       try {
         console.log(
@@ -187,14 +154,10 @@ program
           config.research.searchCriteria.minStars = parseInt(options.minStars);
         if (options.minForks)
           config.research.searchCriteria.minForks = parseInt(options.minForks);
-        if (options.maxFiles)
-          config.analysis.maxFilesPerProject = parseInt(options.maxFiles);
-        if (options.maxSize)
-          config.analysis.maxFileSize = parseInt(options.maxSize) * 1024 * 1024;
         if (options.concurrency)
           config.analysis.concurrency = parseInt(options.concurrency);
-        if (options.maxProjects)
-          config.analysis.maxProjectsToAnalyze = parseInt(options.maxProjects);
+        if (options.count)
+          config.analysis.maxProjectsToAnalyze = parseInt(options.count);
 
         validateConfig();
 
@@ -254,7 +217,7 @@ program
       console.log(chalk.blue("\n🔍 Checking es-guard availability..."));
       const { ESGuardAnalyzer } = await import("./es-guard-analyzer.ts");
       const analyzer = new ESGuardAnalyzer();
-      const esGuardAvailable = analyzer.checkESGuardAvailability();
+      const esGuardAvailable = await analyzer.checkESGuardAvailability();
 
       if (esGuardAvailable) {
         console.log(chalk.green("✅ es-guard is available"));
@@ -286,11 +249,11 @@ Examples:
   $ es-research fetch                    # Fetch 1000 projects (default)
   $ es-research fetch -s 500            # Fetch 500 projects
   $ es-research analyze                  # Analyze fetched projects
-  $ es-research analyze --max-projects 10 # Analyze only top 10 projects
+  $ es-research analyze --count 10 # Analyze only top 10 projects
   $ es-research report                   # Generate reports
   $ es-research research                 # Run complete pipeline
   $ es-research research -s 200         # Run with 200 projects
-  $ es-research research --max-projects 50 # Run with 200 projects, analyze top 50
+  $ es-research research --count 50 # Run with 200 projects, analyze top 50
   $ es-research config                   # Show configuration
   $ es-research validate                 # Validate setup
 

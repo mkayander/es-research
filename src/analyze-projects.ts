@@ -1,13 +1,8 @@
 #!/usr/bin/env bun
 
-import {
-  GitHubClient,
-  type GitHubRepository,
-  type GitHubContent,
-} from "./github-client.js";
+import { GitHubClient, type GitHubRepository } from "./github-client.js";
 import {
   ESGuardAnalyzer,
-  type FileToAnalyze,
   type ProjectAnalysisResult,
 } from "./es-guard-analyzer.js";
 import { config, validateConfig } from "./config.js";
@@ -15,12 +10,15 @@ import {
   loadJson,
   saveJson,
   ensureDir,
-  filterFiles,
   parseRepositoryName,
   calculateConfidenceInterval,
 } from "./utils.js";
 import chalk from "chalk";
 import cliProgress from "cli-progress";
+import { promises as fs, existsSync } from "node:fs";
+import { join } from "path";
+import { execSync } from "child_process";
+import { tmpdir } from "os";
 
 interface AnalysisError {
   project: string;
@@ -49,17 +47,10 @@ interface AnalysisSummary {
     };
     averageIssuesPerProject: number;
     averageIssuesPerFile: number;
-    averageFilesPerProject: number;
   };
   issueCategories: Record<string, number>;
   issueSeverity: Record<string, number>;
   topIssues: Record<string, number>;
-}
-
-interface FileInfo {
-  path: string;
-  size?: number;
-  type?: string;
 }
 
 interface ProjectsData {
@@ -117,16 +108,6 @@ async function main(): Promise<void> {
       console.log(chalk.blue(`📊 Analyzing ${projects.length} projects`));
     }
 
-    // Check es-guard availability
-    const analyzer = new ESGuardAnalyzer();
-    const esGuardAvailable = analyzer.checkESGuardAvailability();
-
-    if (!esGuardAvailable) {
-      throw new Error("es-guard is not available. Please install it first.");
-    }
-
-    console.log(chalk.green("✅ es-guard is available"));
-
     // Create output directories
     await ensureDir(config.output.dataDir);
     await ensureDir(config.output.reportsDir);
@@ -154,11 +135,7 @@ async function main(): Promise<void> {
 
       try {
         // Analyze project
-        const projectResult = await analyzeProject(
-          githubClient,
-          analyzer,
-          project
-        );
+        const projectResult = await analyzeProject(githubClient, project);
         results.push(projectResult);
 
         // Save individual project result
@@ -200,8 +177,6 @@ async function main(): Promise<void> {
         timestamp: new Date().toISOString(),
         config: {
           sampleSize: config.research.sampleSize,
-          maxFilesPerProject: config.analysis.maxFilesPerProject,
-          maxFileSize: config.analysis.maxFileSize,
           maxProjectsToAnalyze: config.analysis.maxProjectsToAnalyze,
         },
       },
@@ -226,143 +201,125 @@ async function main(): Promise<void> {
 
 /**
  * Main logic:
- * - Get repository contents
- * - Recursively get all files
- * - Filter files for analysis
- * - Limit files per project
- * - Get file contents
+ * - Clone repository to temporary directory
+ * - Build NextJS project
  * - Analyze with es-guard
  * - Return analysis result
  */
 async function analyzeProject(
-  githubClient: GitHubClient,
-  analyzer: ESGuardAnalyzer,
+  _githubClient: GitHubClient,
   project: GitHubRepository
-): Promise<
-  ProjectAnalysisResult & {
-    fileDiscovery: {
-      totalFiles: number;
-      filteredFiles: number;
-      analyzedFiles: number;
-      skippedFiles: number;
-    };
-  }
-> {
+): Promise<ProjectAnalysisResult & {}> {
   const { owner, name } = parseRepositoryName(project.full_name);
 
-  // Get repository contents
-  const contents = await githubClient.getRepositoryContents(owner, name);
-  if (!contents) {
-    throw new Error("Repository not accessible");
-  }
+  // Create temporary directory for this repository
+  const tempDir = join(tmpdir(), `es-research-${owner}-${name}`);
+  await fs.rm(tempDir, { recursive: true, force: true });
+  await ensureDir(tempDir);
 
-  // Recursively get all files
-  const files = await getAllFiles(githubClient, owner, name, contents);
+  try {
+    // Clone repository
+    console.log(chalk.gray(`  📥 Cloning ${project.full_name}...`));
+    const cloneUrl = project.clone_url;
 
-  // Filter files for analysis
-  const filteredFiles = filterFiles(
-    files,
-    config.research.filePatterns,
-    config.research.excludePatterns,
-    config.analysis.maxFileSize
-  );
+    // Use git clone with depth 1 for faster cloning
+    execSync(`git clone --depth 1 --single-branch "${cloneUrl}" "${tempDir}"`, {
+      stdio: "pipe",
+    });
 
-  // Limit files per project
-  const filesToAnalyze = filteredFiles.slice(
-    0,
-    config.analysis.maxFilesPerProject
-  );
-
-  // Get file contents
-  const filesWithContent: FileToAnalyze[] = [];
-  for (const file of filesToAnalyze) {
+    // Build NextJS project
+    console.log(chalk.gray(`  🔨 Building ${project.full_name}...`));
     try {
-      const content = await githubClient.getFileContent(owner, name, file.path);
-      if (content) {
-        filesWithContent.push({
-          path: file.path,
-          content,
-        });
-      }
-    } catch (error) {
-      // Skip files that can't be read
+      await buildNextJSProject(tempDir);
+    } catch (buildError) {
       console.warn(
         chalk.yellow(
-          `Warning: Could not read ${file.path}: ${(error as Error).message}`
+          `⚠️  Build failed for ${project.full_name}: ${(buildError as Error).message}`
+        )
+      );
+      console.log(
+        chalk.gray(`  📝 Continuing with analysis of source files...`)
+      );
+    }
+
+    // Analyze with es-guard
+    const analyzer = new ESGuardAnalyzer();
+    const analysisResult = await analyzer.analyzeProject(project, tempDir);
+
+    return {
+      ...analysisResult,
+    };
+  } finally {
+    // Clean up temporary directory
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch (error) {
+      console.warn(
+        chalk.yellow(
+          `Warning: Could not clean up temporary directory ${tempDir}: ${
+            (error as Error).message
+          }`
         )
       );
     }
   }
-
-  // Analyze with es-guard
-  const analysisResult = await analyzer.analyzeProject(
-    project,
-    filesWithContent
-  );
-
-  return {
-    ...analysisResult,
-    fileDiscovery: {
-      totalFiles: files.length,
-      filteredFiles: filteredFiles.length,
-      analyzedFiles: filesWithContent.length,
-      skippedFiles: files.length - filteredFiles.length,
-    },
-  };
 }
 
-async function getAllFiles(
-  githubClient: GitHubClient,
-  owner: string,
-  repo: string,
-  contents: GitHubContent[],
-  path = ""
-): Promise<FileInfo[]> {
-  const files: FileInfo[] = [];
+/**
+ * Build a NextJS project in the given directory
+ */
+async function buildNextJSProject(projectDir: string): Promise<void> {
+  const packageJsonPath = join(projectDir, "package.json");
 
-  for (const item of contents) {
-    const itemPath = path ? `${path}/${item.name}` : item.name;
-
-    if (item.type === "file") {
-      const fileInfo: FileInfo = {
-        path: itemPath,
-        type: item.type,
-      };
-      if (item.size !== undefined) {
-        fileInfo.size = item.size;
-      }
-      files.push(fileInfo);
-    } else if (item.type === "dir") {
-      try {
-        const subContents = await githubClient.getRepositoryContents(
-          owner,
-          repo,
-          itemPath
-        );
-        if (subContents) {
-          const subFiles = await getAllFiles(
-            githubClient,
-            owner,
-            repo,
-            subContents,
-            itemPath
-          );
-          files.push(...subFiles);
-        }
-      } catch (error) {
-        // Skip directories that can't be accessed
-        console.warn(
-          chalk.yellow(
-            `Warning: Could not access directory ${itemPath}: ${
-              (error as Error).message
-            }`
-          )
-        );
-      }
-    }
+  // Check if package.json exists
+  if (!existsSync(packageJsonPath)) {
+    throw new Error("No package.json found");
   }
 
-  return files;
+  // Read package.json to check for NextJS dependency
+  const packageJson = await fs.readFile(packageJsonPath, "utf-8");
+  const packageData = JSON.parse(packageJson);
+
+  const hasNextJS =
+    packageData.dependencies?.next ?? packageData.devDependencies?.next;
+  if (!hasNextJS) {
+    throw new Error("Not a NextJS project");
+  }
+
+  console.log(chalk.gray(`    📦 Installing dependencies...`));
+
+  // Install dependencies
+  try {
+    execSync("npm ci", {
+      cwd: projectDir,
+      stdio: "pipe",
+      timeout: 300000, // 5 minutes timeout
+    });
+  } catch (error) {
+    throw new Error(
+      `Failed to install dependencies: ${(error as Error).message}`
+    );
+  }
+
+  console.log(chalk.gray(`    🏗️  Building project...`));
+
+  // Try to build the project
+  try {
+    // Check for build script
+    if (packageData.scripts?.build) {
+      execSync("npm run build", {
+        cwd: projectDir,
+        stdio: "pipe",
+        timeout: 600000, // 10 minutes timeout for build
+      });
+    } else {
+      throw new Error("No build script found in package.json");
+    }
+
+    console.log(chalk.gray(`    ✅ Build completed successfully`));
+  } catch (error) {
+    throw new Error(`Build failed: ${(error as Error).message}`);
+  }
 }
 
 function generateAnalysisSummary(
@@ -371,11 +328,14 @@ function generateAnalysisSummary(
 ): AnalysisSummary {
   const totalProjects = results.length + errors.length;
   const projectsWithIssues = results.filter(
-    (r) => r.statistics.filesWithIssues > 0
+    (r) => r.results.errors.length > 0 || r.results.warnings.length > 0
   ).length;
-  const totalFiles = results.reduce((sum, r) => sum + r.analysis.totalFiles, 0);
+  const totalFiles = results.reduce(
+    (sum, r) => sum + r.results.errors.length + r.results.warnings.length,
+    0
+  );
   const totalIssues = results.reduce(
-    (sum, r) => sum + r.statistics.totalIssues,
+    (sum, r) => sum + r.results.errors.length + r.results.warnings.length,
     0
   );
 
@@ -406,7 +366,6 @@ function generateAnalysisSummary(
       },
       averageIssuesPerProject: totalIssues / results.length,
       averageIssuesPerFile: totalIssues / totalFiles,
-      averageFilesPerProject: totalFiles / results.length,
     },
     issueCategories: aggregateIssueCategories(results),
     issueSeverity: aggregateIssueSeverity(results),
@@ -523,8 +482,8 @@ function displayResults(
       severity === "error"
         ? chalk.red
         : severity === "warning"
-        ? chalk.yellow
-        : chalk.blue;
+          ? chalk.yellow
+          : chalk.blue;
     console.log(color(`  ${severity}: ${count}`));
   }
 

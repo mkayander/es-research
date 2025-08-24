@@ -124,11 +124,19 @@ async function generateCSVReports(
     "Total Files":
       (result as { fileDiscovery?: { totalFiles: number } }).fileDiscovery
         ?.totalFiles ?? 0,
-    "Analyzed Files": result.analysis.analyzedFiles,
-    "Files With Issues": result.statistics.filesWithIssues,
-    "Total Issues": result.statistics.totalIssues,
+    "Analyzed Files":
+      result.results.errors.length + result.results.warnings.length,
+    "Files With Issues":
+      result.results.errors.length + result.results.warnings.length,
+    "Total Issues":
+      result.statistics.severity.error +
+      result.statistics.severity.warning +
+      result.statistics.severity.info,
     "Issue Categories": Object.keys(result.statistics.categories).join("; "),
-    "Has Issues": result.statistics.filesWithIssues > 0 ? "Yes" : "No",
+    "Has Issues":
+      result.results.errors.length + result.results.warnings.length > 0
+        ? "Yes"
+        : "No",
   }));
 
   await projectSummaryCsv.writeRecords(projectRecords);
@@ -160,17 +168,34 @@ async function generateCSVReports(
   }> = [];
 
   for (const result of results) {
-    for (const fileResult of result.results) {
-      for (const issue of fileResult.issues) {
+    // Process errors
+    for (const violation of result.results.errors) {
+      for (const message of violation.messages) {
         issueRecords.push({
           Project: result.project.full_name,
-          "File Path": fileResult.filePath,
-          "Issue Type": issue.type ?? "unknown",
-          Category: issue.category ?? "unknown",
-          Severity: issue.severity ?? "info",
-          Message: issue.message ?? "",
-          Line: issue.line?.toString() ?? "",
-          Column: issue.column?.toString() ?? "",
+          "File Path": violation.file,
+          "Issue Type": message.ruleId ?? "unknown",
+          Category: extractCategory(violation.file),
+          Severity: mapSeverity(message.severity),
+          Message: message.message,
+          Line: (message.line || "").toString(),
+          Column: (message.column || "").toString(),
+        });
+      }
+    }
+
+    // Process warnings
+    for (const violation of result.results.warnings) {
+      for (const message of violation.messages) {
+        issueRecords.push({
+          Project: result.project.full_name,
+          "File Path": violation.file,
+          "Issue Type": message.ruleId ?? "unknown",
+          Category: extractCategory(violation.file),
+          Severity: mapSeverity(message.severity),
+          Message: message.message,
+          Line: (message.line || "").toString(),
+          Column: (message.column || "").toString(),
         });
       }
     }
@@ -433,9 +458,18 @@ function getTopIssuesForProject(
 ): Record<string, number> {
   const issueTypes: Record<string, number> = {};
 
-  for (const fileResult of result.results) {
-    for (const issue of fileResult.issues) {
-      const type = issue.type ?? "unknown";
+  // Process errors
+  for (const violation of result.results.errors) {
+    for (const message of violation.messages) {
+      const type = message.ruleId ?? "unknown";
+      issueTypes[type] = (issueTypes[type] ?? 0) + 1;
+    }
+  }
+
+  // Process warnings
+  for (const violation of result.results.warnings) {
+    for (const message of violation.messages) {
+      const type = message.ruleId ?? "unknown";
       issueTypes[type] = (issueTypes[type] ?? 0) + 1;
     }
   }
@@ -444,6 +478,36 @@ function getTopIssuesForProject(
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5)
     .reduce((obj, [key, value]) => ({ ...obj, [key]: value }), {});
+}
+
+/**
+ * Extract category from file path
+ */
+function extractCategory(filePath: string): string {
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? "unknown";
+  if (ext === "js" || ext === "mjs") return "javascript";
+  if (ext === "ts" || ext === "tsx") return "typescript";
+  if (ext === "jsx") return "jsx";
+  if (ext === "json") return "json";
+  if (ext === "html") return "html";
+  if (ext === "css") return "css";
+  return ext;
+}
+
+/**
+ * Map ESLint severity to our categories
+ */
+function mapSeverity(severity: number): "error" | "warning" | "info" {
+  switch (severity) {
+    case 2:
+      return "error";
+    case 1:
+      return "warning";
+    case 0:
+      return "info";
+    default:
+      return "warning";
+  }
 }
 
 // Run if called directly

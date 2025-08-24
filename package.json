@@ -33,7 +33,7 @@
     "commander": "11.1.0",
     "csv-writer": "1.6.0",
     "dotenv": "16.6.1",
-    "es-guard": "1.11.0",
+    "es-guard": "1.13.1",
     "js-yaml": "4.1.0",
     "octokit": "4.1.4",
     "ora": "7.0.1"

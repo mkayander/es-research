@@ -36,8 +36,6 @@ export interface OutputConfig {
 }
 
 export interface AnalysisConfig {
-  maxFilesPerProject: number;
-  maxFileSize: number;
   analysisTimeout: number;
   concurrency: number;
   maxProjectsToAnalyze: number;
@@ -75,25 +73,14 @@ export const config: Config = {
       createdAfter: "2010-01-01", // Focus on modern projects
     },
 
-    // File patterns to analyze
-    filePatterns: [
-      "**/*.js",
-      "**/*.jsx",
-      "**/*.ts",
-      "**/*.tsx",
-      "**/next.config.js",
-      "**/next.config.mjs",
-    ],
-
-    // Directories to exclude
+    // File patterns to include in analysis
+    filePatterns: ["**/*.js", "**/*.jsx", "**/*.mjs", "**/*.ts", "**/*.tsx"],
+    // File patterns to exclude from analysis
     excludePatterns: [
       "**/node_modules/**",
-      "**/.next/**",
       "**/dist/**",
       "**/build/**",
-      "**/.git/**",
-      "**/coverage/**",
-      "**/.nyc_output/**",
+      "**/.next/**",
     ],
   },
 
@@ -106,16 +93,12 @@ export const config: Config = {
 
   // Analysis Configuration
   analysis: {
-    // Maximum files to analyze per project (to avoid overwhelming)
-    maxFilesPerProject: 100,
-    // Maximum file size to analyze (in bytes)
-    maxFileSize: 1024 * 1024, // 1MB
     // Timeout for es-guard analysis (in milliseconds)
     analysisTimeout: 30000,
     // Concurrent analysis jobs
     concurrency: 5,
     // Maximum number of projects to analyze (0 = analyze all)
-    maxProjectsToAnalyze: 0,
+    maxProjectsToAnalyze: 1,
   },
 };
 
@@ -162,12 +145,6 @@ export function validateConfig(): boolean {
   }
 
   // Analysis configuration validation
-  if (config.analysis.maxFilesPerProject <= 0) {
-    throw new Error("Maximum files per project must be greater than 0");
-  }
-  if (config.analysis.maxFileSize <= 0) {
-    throw new Error("Maximum file size must be greater than 0");
-  }
   if (config.analysis.analysisTimeout <= 0) {
     throw new Error("Analysis timeout must be greater than 0");
   }
