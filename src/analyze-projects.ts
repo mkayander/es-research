@@ -13,6 +13,7 @@ import {
   parseRepositoryName,
   calculateConfidenceInterval,
   detectPackageManager,
+  isCriticalError,
 } from "./utils.js";
 import chalk from "chalk";
 import cliProgress from "cli-progress";
@@ -21,10 +22,33 @@ import { join } from "path";
 import { execSync } from "child_process";
 import { tmpdir } from "os";
 
+// Custom error classes for better error handling
+export class InstallationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InstallationError";
+  }
+}
+
+export class BuildError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BuildError";
+  }
+}
+
+export class NotNextJSProjectError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotNextJSProjectError";
+  }
+}
+
 interface AnalysisError {
   project: string;
   error: string;
   timestamp: string;
+  isCritical: boolean;
 }
 
 interface AnalysisSummary {
@@ -146,18 +170,32 @@ async function main(): Promise<void> {
         // Rate limiting
         await new Promise((resolve) => setTimeout(resolve, 1000));
       } catch (error) {
+        const errorMessage = (error as Error).message;
+        const isCritical = isCriticalError(error as Error);
+
         console.error(
           chalk.red(
-            `\n❌ Error analyzing ${project.full_name}: ${
-              (error as Error).message
-            }`
+            `\n❌ Error analyzing ${project.full_name}: ${errorMessage}`
           )
         );
+
         errors.push({
           project: project.full_name,
-          error: (error as Error).message,
+          error: errorMessage,
           timestamp: new Date().toISOString(),
+          isCritical,
         });
+
+        // Stop processing if this is a critical error
+        if (isCritical) {
+          console.error(
+            chalk.red.bold(
+              `\n🚨 Critical error detected. Stopping analysis process.`
+            )
+          );
+          progressBar.stop();
+          process.exit(1);
+        }
       }
     }
 
@@ -284,7 +322,7 @@ async function buildNextJSProject(projectDir: string): Promise<void> {
   const hasNextJS =
     packageData.dependencies?.next ?? packageData.devDependencies?.next;
   if (!hasNextJS) {
-    throw new Error("Not a NextJS project");
+    throw new NotNextJSProjectError("Not a NextJS project");
   }
 
   console.log(chalk.gray(`    🔎 Detecting package manager...`));
@@ -305,7 +343,7 @@ async function buildNextJSProject(projectDir: string): Promise<void> {
       timeout: 300000, // 5 minutes timeout
     });
   } catch (error) {
-    throw new Error(
+    throw new InstallationError(
       `Failed to install dependencies with ${packageManager.manager}: ${(error as Error).message}`
     );
   }
@@ -322,12 +360,12 @@ async function buildNextJSProject(projectDir: string): Promise<void> {
         timeout: 600000, // 10 minutes timeout for build
       });
     } else {
-      throw new Error("No build script found in package.json");
+      throw new BuildError("No build script found in package.json");
     }
 
     console.log(chalk.gray(`    ✅ Build completed successfully`));
   } catch (error) {
-    throw new Error(
+    throw new BuildError(
       `Build failed with ${packageManager.manager}: ${(error as Error).message}`
     );
   }
@@ -501,7 +539,22 @@ function displayResults(
   if (errors.length > 0) {
     console.log(chalk.red(`\n❌ Failed Analyses:`));
     errors.forEach((error) => {
-      console.log(chalk.red(`  ${error.project}: ${error.error}`));
+      const prefix = error.isCritical ? "🚨 CRITICAL: " : "  ";
+      const color = error.isCritical ? chalk.red.bold : chalk.red;
+
+      // Add package manager info for installation/build errors
+      let displayError = error.error;
+      if (
+        error.error.includes("Failed to install dependencies") ||
+        error.error.includes("Build failed")
+      ) {
+        const packageManagerMatch = error.error.match(/with (\w+):/);
+        if (packageManagerMatch) {
+          displayError = `${error.error} (Package Manager: ${packageManagerMatch[1]})`;
+        }
+      }
+
+      console.log(color(`${prefix}${error.project}: ${displayError}`));
     });
   }
 }

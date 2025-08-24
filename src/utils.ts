@@ -329,3 +329,16 @@ export function detectPackageManager(projectDir: string): PackageManagerInfo {
     "No lock file found. Expected one of: bun.lockb, pnpm-lock.yaml, yarn.lock, or package-lock.json"
   );
 }
+
+/**
+ * Check if an error is critical and should stop the analysis process
+ */
+export function isCriticalError(error: Error): boolean {
+  // Import error classes dynamically to avoid circular dependencies
+  const errorName = error.constructor.name;
+  return (
+    errorName === "InstallationError" ||
+    errorName === "BuildError" ||
+    errorName === "NotNextJSProjectError"
+  );
+}

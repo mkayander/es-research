@@ -21,6 +21,7 @@ import {
   parseRepositoryName,
   type FileInfo,
   detectPackageManager,
+  isCriticalError,
 } from "./utils.js";
 import { tmpdir } from "os";
 
@@ -513,5 +514,37 @@ describe("detectPackageManager", () => {
 
     const result = detectPackageManager(tempDir);
     expect(result.manager).toBe("bun");
+    expect(result.installCommand).toBe("bun install --frozen-lockfile");
+    expect(result.buildCommand).toBe("bun run build");
+  });
+
+  test("should detect critical errors correctly", async () => {
+    // Import the error classes for testing
+    const { InstallationError, BuildError, NotNextJSProjectError } =
+      await import("./analyze-projects.js");
+
+    const criticalErrors = [
+      new InstallationError(
+        "Failed to install dependencies with npm: timeout",
+        "npm"
+      ),
+      new BuildError("Build failed with yarn: script not found", "yarn"),
+      new NotNextJSProjectError("Not a NextJS project"),
+    ];
+
+    const nonCriticalErrors = [
+      new Error("File not found"),
+      new Error("Permission denied"),
+      new Error("Network timeout"),
+    ];
+
+    // Test the isCriticalError function from utils
+    criticalErrors.forEach((error) => {
+      expect(isCriticalError(error)).toBe(true);
+    });
+
+    nonCriticalErrors.forEach((error) => {
+      expect(isCriticalError(error)).toBe(false);
+    });
   });
 });
