@@ -159,6 +159,9 @@ async function main(): Promise<void> {
       progressBar.update(i, { project: project.full_name });
 
       try {
+        // Clear line and show project start
+        console.log(chalk.blue(`\n🔍 Analyzing ${project.full_name}...`));
+
         // Analyze project
         const projectResult = await analyzeProject(githubClient, project);
         results.push(projectResult);
@@ -166,6 +169,9 @@ async function main(): Promise<void> {
         // Save individual project result
         const projectFile = `${config.output.dataDir}/project-${project.id}.json`;
         await saveJson(projectFile, projectResult);
+
+        // Show completion
+        console.log(chalk.green(`✅ ${project.full_name} analysis completed`));
 
         // Rate limiting
         await new Promise((resolve) => setTimeout(resolve, 1000));
